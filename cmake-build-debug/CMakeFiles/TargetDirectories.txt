@@ -1,0 +1,3 @@
+C:/Users/tevra/CLionProjects/labyrintheProject/cmake-build-debug/CMakeFiles/labyrintheProject.dir
+C:/Users/tevra/CLionProjects/labyrintheProject/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/tevra/CLionProjects/labyrintheProject/cmake-build-debug/CMakeFiles/rebuild_cache.dir
