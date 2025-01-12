@@ -93,6 +93,7 @@ void genererArbre(Arbre *arbre, int nombre) {
         }
     }
     current->event = 'S';
+
 }
 
 /**
@@ -110,8 +111,8 @@ int nombreElement(Element *element) {
 /**
  * Collecte tous les nœuds de l'arbre.
  * @param element L'élément à partir duquel commencer la collecte.
- * @param nodes Tableau de nœuds à remplir.
- * @param nodeCount Nombre de nœuds collectés.
+ * @param noeud Tableau de nœuds à remplir.
+ * @param nbNoeuds Nombre de nœuds collectés.
  */
 void collecteNoeuds(Element *element, Element **noeud, int *nbNoeuds) {
     if (element == NULL) return; // Si l'élément est NULL, on ne fait rien
@@ -124,9 +125,9 @@ void collecteNoeuds(Element *element, Element **noeud, int *nbNoeuds) {
 
 /**
  * Trouver un chemin dans l'arbre.
- * @param node Le nœud à partir duquel commencer la recherche.
- * @param pathNodes Tableau de nœuds à remplir.
- * @param pathLength Longueur du chemin.
+ * @param noeud Le nœud à partir duquel commencer la recherche.
+ * @param cheminNoeuds Tableau de nœuds à remplir.
+ * @param longueurChemin Longueur du chemin.
  */
 void chercherChemin(Element *noeud, Element **cheminNoeuds, int *longueurChemin) {
     if (noeud == NULL) return; // Si le nœud est NULL, on ne fait rien
@@ -265,6 +266,8 @@ void genererEvents(Arbre *arbre) {
             char event = possibleEvents[rand() % possibleCount];
             node->event = event;
             eventCounts[(int)event]++;
+        } else {
+            node->event = 'X'; // Noeud standard
         }
     }
 
@@ -284,11 +287,25 @@ void genererEvents(Arbre *arbre) {
 }
 
 /**
+ * Réinitialisation de la visite de tous les nœuds de l'arbre.
+ * @param element L'élément à réinitialiser.
+ */
+void reinitialiserVisite(Element *element) {
+    if (element == NULL) {
+        return;
+    }
+    element->visite = false;
+    reinitialiserVisite(element->suivantG);
+    reinitialiserVisite(element->suivantD);
+}
+
+/**
  * Affichage de l'arbre binaire de façon graphique.
  * @param element L'élément à afficher.
  * @param profondeur La profondeur de l'élément.
+ * @param current L'élément actuel.
  */
-void afficherArbre(Element *element, int profondeur) {
+void afficherArbre(Element *element, int profondeur, Element *current) {
     // Indentation pour la profondeur
     for (int i = 0; i < profondeur; i++) {
         printf("|   ");
@@ -297,13 +314,23 @@ void afficherArbre(Element *element, int profondeur) {
         printf("|-- NULL\n");
         return;
     }
-    printf("|-- %c\n", element->event);
+    if (element == current) {
+        printf("|-- %c " RED "<- Vous etes ici" RESET "\n", element->event);
+    } else if(element == current->parent) {
+        printf("|-- %c " GREEN "<- Parent" RESET "\n", element->event);
+    } else if(element == current->suivantG) {
+        printf("|-- %c " GREEN "<- Gauche" RESET "\n", element->event);
+    } else if(element == current->suivantD) {
+        printf("|-- %c " GREEN "<- Droite" RESET "\n", element->event);
+    } else {
+        printf("|-- %c\n", element->event);
+    }
 
     // On affiche les sous-arbres en commençant par le sous-arbre gauche
-    afficherArbre(element->suivantG, profondeur + 1);
+    afficherArbre(element->suivantG, profondeur + 1, current);
 
     // puis le droit
-    afficherArbre(element->suivantD, profondeur + 1);
+    afficherArbre(element->suivantD, profondeur + 1, current);
 }
 
 /**
@@ -316,12 +343,12 @@ void afficherArbreJoueur(Arbre *arbre) {
 
     // Afficher le parent s'il existe
     if (current->parent != NULL) {
-        printf("          [%c]\n", current->parent->event);
+        current->parent->visite ? printf("          [%c]\n", current->parent->event) : printf("          [?]\n");
         printf("           |\n");
     }
 
     // Afficher le nœud actuel
-    printf("          [%c] <- Vous etes ici\n", current->event);
+    current->visite ? printf("          [%c] <- Vous etes ici\n", current->event) : printf("          [?] <- Vous etes ici\n");
     printf("         /   \\\n");
 
     // Afficher les enfants
@@ -333,11 +360,15 @@ void afficherArbreJoueur(Arbre *arbre) {
             printf("      \n");
         }
     } else if (current->suivantD != NULL) {
-        printf("              [%c]\n", current->suivantD->event);
+        current->suivantD->visite ? printf("              [%c]\n", current->suivantD->event) : printf("              [?]\n");
     } else {
         printf("               \n");
     }
 
+    // si on est à la sortie, on affiche pas les choix possibles
+    if (current->event == 'S') {
+        return;
+    }
     // Afficher les choix possibles
     printf("\nChoix possibles:\n");
     int option = 1;
@@ -348,63 +379,150 @@ void afficherArbreJoueur(Arbre *arbre) {
         printf("%d. -> pour aller a droite \n", option++);
     }
     if (current->parent != NULL) {
-        printf("%d. ^ pour revenir au parent \n", option++, current->parent->event);
+        printf("%d. ^ pour revenir au parent \n", option++);
     }
-    printf("%d.Echap pour quitter\n\n", option);
+    printf("%d. Echap pour quitter\n\n", option);
 }
 
 /**
  * Boucle de jeu.
  * @param arbre L'arbre binaire à parcourir.
  */
-void boucleJeu(Arbre *arbre) {
+void boucleJeu(Arbre *arbre, int debug) {
+    bool cleTrouvee = false;
     // Boucle du jeu
     while (1) {
-        // on met le noeud actuel en visité
-        arbre->current->visite = true;
-        afficherArbreJoueur(arbre);
-        printf("Utilisez les fleches pour naviguer, Echap pour quitter.\n\n");
+        // si on visite pour la première fois la salle R
+        if (arbre->current->event == 'R' && arbre->current->visite == false) {
+            printf("Vous avez perdu la memoire, vous ne savez plus ou vous êtes.\n");
+            // on réinitialise toutes les salles visitées en les mettant à false
+            reinitialiserVisite(arbre->premier);
+        }
 
-        int ch = getch();
-        if (ch == 0 || ch == 224) {
-            // Touches spéciales (flèches)
-            ch = getch();
-            switch (ch) {
-                case 72: // Fleche haut
-                    if (arbre->current->parent != NULL) {
-                        arbre->current = arbre->current->parent;
-                    } else {
-                        printf("Pas de parent.\n");
-                    }
-                    break;
-                case 75: // Fleche gauche
-                    if (arbre->current->suivantG != NULL) {
-                        arbre->current = arbre->current->suivantG;
-                    } else {
-                        printf("Pas de noeud gauche.\n");
-                    }
-                    break;
-                case 77: // Fleche droite
-                    if (arbre->current->suivantD != NULL) {
-                        arbre->current = arbre->current->suivantD;
-                    } else {
-                        printf("Pas de noeud droit.\n");
-                    }
-                    break;
-                default:
-                    // Autres touches ignorees
-                    break;
+        // si on visite pour la première fois la salle U
+        if (arbre->current->event == 'U' && arbre->current->visite == false) {
+            printf("Vous tombez de l'arbre ! Retour au debut.\n");
+            arbre->current->visite = true;
+            arbre->current = arbre->premier;
+        }
+
+        // si on visite pour la première fois la clé
+        if (arbre->current->event == 'K' && arbre->current->visite == false) {
+            printf("Vous trouvez une cle ! Mais ou est la porte ?\n");
+            cleTrouvee = true;
+        }
+
+        // si on trouve la porte pour la première fois
+        if (arbre->current->event == 'D' && arbre->current->visite == false) {
+            if (cleTrouvee) {
+                printf("Vous tombez sur une porte fermee a cle, et ca tombe bien, vous avez deja la cle !\n");
+            } else {
+                printf("Vous tombez sur une porte fermee a cle. Mais ou est la cle pour avancer ?\n");
             }
-        } else if (ch == 27) {
-            // Touche Echap pour quitter
-            printf("Vous avez quitte le jeu.\n");
-            break;
+        }
+
+        // si on visite la salle B
+        if (arbre->current->event == 'B') {
+            printf("Il y a beaucoup de brouillard ici ...\n");
+        }
+
+        // on met le noeud actuel en visité, sauf si c'est un brouillard
+        if (arbre->current->event != 'B' && arbre->current->event != 'A') {
+            arbre->current->visite = true;
+        }
+        if (debug) {
+            afficherArbre(arbre->premier, 0, arbre->current);
+            // on affiche les mouvements possibles
+            printf("\nChoix possibles:\n");
+            int option = 1;
+            if (arbre->current->suivantG != NULL) {
+                printf("%d. <- pour aller a gauche \n", option++);
+            }
+            if (arbre->current->suivantD != NULL) {
+                printf("%d. -> pour aller a droite \n", option++);
+            }
+            if (arbre->current->parent != NULL) {
+                printf("%d. ^ pour revenir au parent \n", option++);
+            }
+            printf("%d. Echap pour quitter\n\n", option);
+        } else {
+            afficherArbreJoueur(arbre);
+        }
+        // si on visite pour la première fois la salle A
+        if (arbre->current->event == 'A' && arbre->current->visite == false) {
+            printf("Tu es désorienté, ton prochain mouvement sera aléatoire.\n");
+            int ch = getch();
+            // On choisit un mouvement aléatoire, entre parent, gauche et droite (s'ils existent).
+            int i = 0;
+            Element *mouvements[3]; // Tableau pour stocker les mouvements possibles
+            if (arbre->current->parent != NULL) { // Si le parent existe
+                mouvements[i++] = arbre->current->parent; // On l'ajoute
+            }
+            if (arbre->current->suivantG != NULL) { // Si le nœud gauche existe
+                mouvements[i++] = arbre->current->suivantG; // On l'ajoute
+            }
+            if (arbre->current->suivantD != NULL) { // Si le nœud droit existe
+                mouvements[i++] = arbre->current->suivantD; // On l'ajoute
+            }
+            arbre->current = mouvements[rand() % i]; // On choisit un mouvement aléatoire parmi les mouvements possibles
+        } else {
+            printf("Utilisez les fleches pour naviguer, Echap pour quitter.\n\n");
+            int ch = getch();
+            if (ch == 0 || ch == 224) {
+                // Touches spéciales (flèches)
+                ch = getch();
+                switch (ch) {
+                    case 72: // Fleche haut
+                        if (arbre->current->parent != NULL) {
+                            arbre->current = arbre->current->parent;
+                        } else {
+                            printf("Pas de parent.\n");
+                        }
+                    break;
+                    case 75: // Fleche gauche
+                        if (arbre->current->event == 'D' && cleTrouvee == false) {
+                            printf("La porte est fermée à cle, vous ne pouvez pas passer.\n");
+                        } else if (arbre->current->suivantG != NULL) {
+                            arbre->current = arbre->current->suivantG;
+                        } else {
+                            printf("Pas de noeud gauche.\n");
+                        }
+                    break;
+                    case 77: // Fleche droite
+                        if (arbre->current->event == 'D' && cleTrouvee == false) {
+                            printf("La porte est fermee a cle, vous ne pouvez pas passer.\n");
+                        } else if (arbre->current->suivantD != NULL) {
+                            arbre->current = arbre->current->suivantD;
+                        } else {
+                            printf("Pas de noeud droit.\n");
+                        }
+                    break;
+                    default:
+                        // Autres touches ignorees
+                            break;
+                }
+            } else if (ch == 27) {
+                // Touche Echap pour quitter
+                printf("Vous avez quitte le jeu.\n");
+                getch(); // Attendre une touche pour quitter
+                break;
+            }
         }
         // Vérifier si le joueur a atteint la sortie
         if (arbre->current->event == 'S') {
+            system("cls");
             printf("Felicitations ! Vous avez trouve la sortie.\n");
+            arbre->current->visite = true;
+            if (debug) {
+                afficherArbre(arbre->premier, 0, arbre->current);
+            } else {
+                afficherArbreJoueur(arbre);
+            }
+            getch(); // Attendre une touche pour quitter
             break;
         }
+        // on clear la console
+        system("cls");
     }
 }
 

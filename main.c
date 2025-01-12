@@ -21,8 +21,9 @@ void main(void) {
                 Arbre *arbreMini = init(); // Initialiser l'arbre
                 genererArbre(arbreMini, 10); // Générer l'arbre avec un nombre de nœuds donné
                 arbreMini->current = arbreMini->premier; // on initialise la position du joueur
-
-                boucleJeu(arbreMini); // on lance la boucle de jeu
+                // on clear la console
+                system("cls");
+                boucleJeu(arbreMini, 0); // on lance la boucle de jeu
                 break;
             case 2:
                 // Mode Normal
@@ -30,15 +31,18 @@ void main(void) {
                 genererArbre(arbre, 10); // Générer l'arbre avec un nombre de nœuds donné
                 genererEvents(arbre); // Générer les événements
                 arbre->current = arbre->premier; // on initialise la position du joueur
-
-                boucleJeu(arbre); // on lance la boucle de jeu
+                // on clear la console
+                system("cls");
+                boucleJeu(arbre, 0); // on lance la boucle de jeu
                 break;
             case 3:
                 Arbre *arbreDebug = init(); // Initialiser l'arbre
                 genererArbre(arbreDebug, 10); // Générer l'arbre avec un nombre de nœuds donné
+                genererEvents(arbreDebug); // Générer les événements
+                arbreDebug->current = arbreDebug->premier; // on initialise la position du joueur
                 printf("%d noeu(x) ont ete genere(s)\n\n", nombreElement(arbreDebug->premier));
                 // on affiche l'arbre
-                afficherArbre(arbreDebug->premier, 0);
+                boucleJeu(arbreDebug, 1);
                 break;
             case 4:
                 printf("Affichage des regles\n");
